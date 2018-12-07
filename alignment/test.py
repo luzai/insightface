@@ -4,7 +4,7 @@ import numpy as np
 import datetime
 from alignment import Alignment
 sys.path.append('../SSH')
-from ssh_detector import SSHDetector
+from SSH.ssh_detector import SSHDetector
 
 #short_max = 800
 scales = [1200, 1600]
