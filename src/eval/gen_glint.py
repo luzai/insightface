@@ -44,9 +44,11 @@ def get_feature(buffer):
         input_blob = np.zeros((len(buffer), 3, image_shape[1], image_shape[2]))
     idx = 0
     for item in buffer:
-        img = face_preprocess.read_image(share_path+ item[0], mode='rgb')
+        img = face_preprocess.read_image(share_path + item[0], mode='rgb')
         img = face_preprocess.preprocess(img, bbox=None, landmark=item[1],
                                          image_size='%d,%d' % (image_shape[1], image_shape[2]))
+        # plt_imshow(img)
+        # plt.show()
         img = np.transpose(img, (2, 0, 1))
         attempts = [0, 1] if use_flip else [0]
         for flipid in attempts:
@@ -111,9 +113,13 @@ def main(args):
     features_all = np.zeros((data_size, emb_size), dtype=np.float32)
     fstart = 0
     buffer = []
-    for line in open(args.input, 'r'):
+    lines = open(args.input, 'r').readlines()
+    print(  len(lines))
+    # i=1148000
+    # for line in lines[1148000:]:
+    for line in lines :
         if i % 1000 == 0:
-            print("processing ", i)
+            logging.info("processing ", i, len(lines)  )
         i += 1
         image_path, label, bbox, landmark, aligned = face_preprocess.parse_lst_line_glint(line)
         buffer.append((image_path, landmark))
@@ -135,6 +141,7 @@ def main(args):
 
 from lz import *
 
+
 def parse_arguments(argv):
     parser = argparse.ArgumentParser()
     
@@ -145,14 +152,14 @@ def parse_arguments(argv):
     parser.add_argument('--model', type=str, help='', default='')
     parser.set_defaults(
         batch_size=128,
-        model=root_path + 'Evaluation/IJB/pretrained_models/MS1MV2-ResNet100-Arcface/model,0',
-        # input=share_path2 + 'glint',
+        # model=root_path + 'Evaluation/IJB/pretrained_models/MS1MV2-ResNet100-Arcface/model,0',
+        model=root_path + 'logs/model-r100-arcface-ms1m-refine-v2/model,0',
         input=share_path + 'testdata_lmk.txt',
-        output=work_path + 'arc.r100.bin',
+        output=work_path + 'arc.r100.3.bin',
     )
     return parser.parse_args(argv)
 
 
 if __name__ == '__main__':
-    os.environ['CUDA_VISIBLE_DEVICES'] = "2"
+    os.environ['CUDA_VISIBLE_DEVICES'] = "3"
     main(parse_arguments(sys.argv[1:]))

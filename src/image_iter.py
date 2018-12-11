@@ -36,8 +36,11 @@ class FaceImageIter(io.DataIter):
                  shuffle=False, aug_list=None, mean=None,
                  rand_mirror=False, cutoff=0, color_jittering=0,
                  images_filter=0,
-                 data_name='data', label_name='softmax_label', **kwargs):
+                 data_name='data', label_name='softmax_label',
+                 metric_learning=False,
+                 **kwargs):
         super(FaceImageIter, self).__init__()
+        self.metric_learning=metric_learning
         assert path_imgrec
         if path_imgrec:
             logging.info('loading recordio %s...',

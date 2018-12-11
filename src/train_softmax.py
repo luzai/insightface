@@ -4,8 +4,9 @@ from __future__ import print_function
 
 import os
 
-os.environ['CUDA_VISIBLE_DEVICES'] = "2,3"
+os.environ['CUDA_VISIBLE_DEVICES'] = "1,3"
 import lz
+
 lz.init_mxnet()
 import sys
 import math
@@ -95,7 +96,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Train face network')
     # general
     parser.add_argument('--data-dir', default='', help='training set directory')
-    parser.add_argument('--prefix', default='../model/model', help='directory to save model.')
+    parser.add_argument('--prefix', default='', help='directory to save model.')
     parser.add_argument('--pretrained', default='', help='pretrained model to load')
     parser.add_argument('--ckpt', type=int, default=1,
                         help='checkpoint saving option. 0: discard saving. 1: save when necessary. 2: always save')
@@ -112,7 +113,7 @@ def parse_args():
     parser.add_argument('--version-unit', type=int, default=3, help='resnet unit config')
     parser.add_argument('--version-multiplier', type=float, default=1.0, help='filters multiplier')
     parser.add_argument('--version-act', type=str, default='prelu', help='network activation config')
-    parser.add_argument('--use-deformable', type=int, default=0, help='use deformable cnn in network')
+    parser.add_argument('--use-deformable', type=int, default=0, help='use deformable cnn in network')  # todo
     parser.add_argument('--lr', type=float, default=0.1, help='start learning rate')
     parser.add_argument('--lr-steps', type=str, default='', help='steps of lr changing')
     parser.add_argument('--wd', type=float, default=0.0005, help='weight decay')
@@ -142,7 +143,9 @@ def parse_args():
     parser.add_argument('--target', type=str, default='lfw,cfp_fp,agedb_30', help='verification targets')
     parser.add_argument('--ce-loss', default=False, action='store_true', help='if output ce loss')
     
-    DATA_DIR = "/data2/share/faces_ms1m_112x112"
+    # DATA_DIR = "/data1/share/faces_ms1m_112x112"
+    DATA_DIR = "/share/data/faces_ms1m_112x112"
+    # NETWORK = "r100"
     NETWORK = "r50"
     JOB = "-comb.bak"
     LOSSTP = "5"
@@ -154,16 +157,23 @@ def parse_args():
     LOGFILE = MODELDIR + '/log'
     
     parser.set_defaults(
+        lr=1e-5, lr_steps='',   # init lr 1e-1, final lr 1e-4
+        fc7_lr_mult=1e4,
         data_dir=DATA_DIR,
         network=NETWORK,
         loss_type=LOSSTP,
         prefix=PREFIX,
-        per_batch_size=100,
-        target="",  # cfp_fp cfp_fp,agedb_30
+        per_batch_size=50,
+        target="lfw",  #
+        # target="",
         ce_loss=True,
         margin_a=.9,
         margin_m=.4,
         margin_b=.15,
+        pretrained='../logs/model-r50-arcface-ms1m-refine-v1/model,0',
+        # pretrained='../logs/model-r100-softmax1e3/model,207',
+        # verbose=60,
+        ckpt=2, # always save
     )
     
     args = parser.parse_args()
@@ -362,7 +372,7 @@ def get_symbol(args, arg_params, aux_params):
         gt_one_hot = mx.sym.one_hot(gt_label, depth=args.num_classes, on_value=1.0, off_value=0.0)
         body = mx.sym.broadcast_mul(gt_one_hot, diff)
         fc7 = fc7 + body
-    elif args.loss_type == 5:
+    elif args.loss_type == 5: # combined
         s = args.margin_s
         m = args.margin_m
         assert s > 0.0
@@ -613,7 +623,7 @@ def train_net(args):
             print('[%s][%d]Accuracy-Flip: %1.5f+-%1.5f' % (ver_name_list[i], nbatch, acc2, std2))
             results.append(acc2)
         return results
-    
+    # ver_test( 0 )
     highest_acc = [0.0, 0.0]  # lfw and target
     # for i in xrange(len(ver_list)):
     #  highest_acc.append(0.0)
@@ -642,7 +652,7 @@ def train_net(args):
         
         _cb(param)
         if mbatch % 1000 == 0:
-            print('lr-batch-epoch:', opt.lr, param.nbatch, param.epoch)
+            print('lr-batch-epoch: lr nbatch epoch mbatch lr_step', opt.lr, param.nbatch, param.epoch, mbatch, lr_steps)
         
         if mbatch >= 0 and mbatch % args.verbose == 0:
             acc_list = ver_test(mbatch)
@@ -680,6 +690,7 @@ def train_net(args):
                 print('saving', msave)
                 arg, aux = model.get_params()
                 mx.model.save_checkpoint(prefix, msave, model.symbol, arg, aux)
+                
             print('[%d]Accuracy-Highest: %1.5f' % (mbatch, highest_acc[-1]))
         if mbatch <= args.beta_freeze:
             _beta = args.beta

@@ -193,7 +193,7 @@ def load_bin(path, image_size):
     try:
         bins, issame_list = pickle.load(open(path, 'rb'))
     except:
-        bins, issame_list = pickle.load(open(path, 'rb', ), encoding='latin1')
+        bins, issame_list = pickle.load(open(path, 'rb', ), encoding='bytes')
     data_list = []
     for flip in [0, 1]:
         data = nd.empty((len(issame_list) * 2, 3, image_size[0], image_size[1]))
