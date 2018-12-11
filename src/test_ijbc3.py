@@ -35,14 +35,10 @@ except:
     df_dump(df_pair, ijbcp, 'pair')
     df_dump(df_name, ijbcp, 'name')
 
-
 model_path = root_path + 'Evaluation/IJB/pretrained_models/MS1MV2-ResNet100-Arcface/model'
 assert os.path.exists(os.path.dirname(model_path)), os.path.dirname(model_path)
 gpu_id = 2
 embedding = Embedding(model_path, 0, gpu_id)
-
-
-
 logging.info('learner loaded')
 
 # use_topk = 999
@@ -126,7 +122,6 @@ plt.figure()
 plt.semilogx(fpr, tpr, '.-')
 plt.show()
 
-
 fpr = np.flipud(fpr)
 tpr = np.flipud(tpr)  # select largest tpr at same fpr
 
@@ -136,10 +131,12 @@ for fpr_iter in np.arange(len(x_labels)):
     print(x_labels[fpr_iter], tpr[min_index])
 
 from sklearn.metrics import auc
+
 roc_auc = auc(fpr, tpr)
 print(roc_auc)
 
-msgpack_dump([label, score], work_path+'ijb3.mxnet.pk')
+msgpack_dump([label, score], work_path + 'ijb3.mxnet.pk')
 
 from IPython import embed
+
 embed()

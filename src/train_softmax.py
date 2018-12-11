@@ -4,7 +4,7 @@ from __future__ import print_function
 
 import os
 
-os.environ['CUDA_VISIBLE_DEVICES'] = "1,3"
+os.environ['CUDA_VISIBLE_DEVICES'] = "0,1"
 import lz
 
 lz.init_mxnet()
@@ -163,7 +163,7 @@ def parse_args():
         network=NETWORK,
         loss_type=LOSSTP,
         prefix=PREFIX,
-        per_batch_size=50,
+        per_batch_size=100,
         target="lfw",  #
         # target="",
         ce_loss=True,
