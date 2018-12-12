@@ -4,7 +4,7 @@ from __future__ import print_function
 
 import os
 
-os.environ['CUDA_VISIBLE_DEVICES'] = "0,1"
+os.environ['CUDA_VISIBLE_DEVICES'] = "0"
 import lz
 
 lz.init_mxnet()
@@ -144,10 +144,11 @@ def parse_args():
     parser.add_argument('--ce-loss', default=False, action='store_true', help='if output ce loss')
     
     # DATA_DIR = "/data1/share/faces_ms1m_112x112"
-    DATA_DIR = "/share/data/faces_ms1m_112x112"
+    DATA_DIR = "/data2/share/glint"
+    # DATA_DIR = "/share/data/faces_ms1m_112x112"
     # NETWORK = "r100"
     NETWORK = "r50"
-    JOB = "-comb.bak"
+    JOB = "-comb.glint"
     LOSSTP = "5"
     MODELDIR = "../logs/model-" + NETWORK + JOB
     if not os.path.exists(MODELDIR):
@@ -157,23 +158,23 @@ def parse_args():
     LOGFILE = MODELDIR + '/log'
     
     parser.set_defaults(
-        lr=1e-5, lr_steps='',   # init lr 1e-1, final lr 1e-4
+        lr=1e-5, lr_steps='',  # init lr 1e-1, final lr 1e-4
         fc7_lr_mult=1e4,
         data_dir=DATA_DIR,
         network=NETWORK,
         loss_type=LOSSTP,
         prefix=PREFIX,
         per_batch_size=100,
-        target="lfw",  #
+        target="",  # lfw
         # target="",
         ce_loss=True,
         margin_a=.9,
         margin_m=.4,
         margin_b=.15,
-        pretrained='../logs/model-r50-arcface-ms1m-refine-v1/model,0',
-        # pretrained='../logs/model-r100-softmax1e3/model,207',
+        # pretrained='../logs/model-r50-arcface-ms1m-refine-v1/model,0',
+        pretrained='../logs/model-r50-comb.glint/model,9',
         # verbose=60,
-        ckpt=2, # always save
+        ckpt=2,  # always save
     )
     
     args = parser.parse_args()
@@ -372,7 +373,7 @@ def get_symbol(args, arg_params, aux_params):
         gt_one_hot = mx.sym.one_hot(gt_label, depth=args.num_classes, on_value=1.0, off_value=0.0)
         body = mx.sym.broadcast_mul(gt_one_hot, diff)
         fc7 = fc7 + body
-    elif args.loss_type == 5: # combined
+    elif args.loss_type == 5:  # combined
         s = args.margin_s
         m = args.margin_m
         assert s > 0.0
@@ -475,6 +476,7 @@ def get_symbol(args, arg_params, aux_params):
         raise ValueError('no loss type')
     out_list = [mx.symbol.BlockGrad(embedding)]
     softmax = mx.symbol.SoftmaxOutput(data=fc7, label=gt_label, name='softmax', normalization='valid')
+    
     out_list.append(softmax)
     if args.loss_type == 6:
         out_list.append(intra_loss)
@@ -623,6 +625,7 @@ def train_net(args):
             print('[%s][%d]Accuracy-Flip: %1.5f+-%1.5f' % (ver_name_list[i], nbatch, acc2, std2))
             results.append(acc2)
         return results
+    
     # ver_test( 0 )
     highest_acc = [0.0, 0.0]  # lfw and target
     # for i in xrange(len(ver_list)):
@@ -690,7 +693,7 @@ def train_net(args):
                 print('saving', msave)
                 arg, aux = model.get_params()
                 mx.model.save_checkpoint(prefix, msave, model.symbol, arg, aux)
-                
+            
             print('[%d]Accuracy-Highest: %1.5f' % (mbatch, highest_acc[-1]))
         if mbatch <= args.beta_freeze:
             _beta = args.beta

@@ -30,17 +30,17 @@ logger = logging.getLogger()
 
 
 class FaceImageIter(io.DataIter):
-    
     def __init__(self, batch_size, data_shape,
                  path_imgrec=None,
                  shuffle=False, aug_list=None, mean=None,
                  rand_mirror=False, cutoff=0, color_jittering=0,
                  images_filter=0,
                  data_name='data', label_name='softmax_label',
-                 metric_learning=False,
+                 metric_learning=True,
+                 # metric_learning=False, # todo  metric learning batch formation method do not affetcts the scale of loss ?
                  **kwargs):
         super(FaceImageIter, self).__init__()
-        self.metric_learning=metric_learning
+        self.metric_learning = metric_learning
         assert path_imgrec
         if path_imgrec:
             logging.info('loading recordio %s...',
@@ -101,10 +101,14 @@ class FaceImageIter(io.DataIter):
         self.color_jittering = color_jittering
         self.CJA = mx.image.ColorJitterAug(0.125, 0.125, 0.125)
         self.provide_label = [(label_name, (batch_size,))]
+        logging.info(f'one iter: provide {self.provide_data}, {self.provide_label}')
         # print(self.provide_label[0][1])
         self.cur = 0
         self.nbatch = 0
         self.is_init = False
+        self.num_instances = 4
+        self.num_pids_per_batch = self.batch_size // self.num_instances
+        self.inds_queue = []
     
     def reset(self):
         """Resets the iterator to the beginning of the data."""
@@ -117,6 +121,66 @@ class FaceImageIter(io.DataIter):
     
     def num_samples(self):
         return len(self.seq)
+    
+    def get_batch_ids(self):
+        pids = []
+        # dop = gl_conf.dop
+        # lz.logging.info(f'dop smapler {np.count_nonzero( dop == -1 )} {dop}')
+        pids_now = np.random.choice(self.seq_identity,
+                                    size=int(self.num_pids_per_batch),
+                                    replace=False)
+        pids.extend(pids_now.tolist())
+        # while len(pids) < self.num_pids_per_batch:
+        #     pids_next = []
+        #     for pid in pids_now:
+        #         if dop[pid] == -1 or dop[pid] in pids_next or dop[pid] in pids:
+        #             pid_t = np.random.choice(self.ids, )
+        #             # make sure id is unique
+        #             while pid_t in pids_next or pid_t in pids:
+        #                 pid_t = np.random.choice(self.ids, )
+        #             pids_next.append(pid_t)
+        #         else:
+        #             pids_next.append(dop[pid])
+        #     pids.extend(pids_next)
+        #     pids_now = pids_next
+        assert len(pids) == np.unique(pids).shape[0]
+        return pids
+    
+    def get_batch_idxs(self):
+        inds = []
+        pids = self.get_batch_ids()
+        for pid in pids:
+            a, b = self.id2range[pid]
+            inds.extend(
+                np.random.choice(
+                    list(range(a, b)),
+                    size=(self.num_instances,),
+                    replace=True,
+                ).tolist()
+            )
+        inds = inds[:self.batch_size]
+        return inds
+    
+    def next_sample_metric_learning(self):
+        while True:
+            if self.cur >= len(self.seq):
+                raise StopIteration
+            # if self.cur % self.batch_size == 0:
+            if len(self.inds_queue) == 0:
+                self.inds_queue += self.get_batch_idxs()
+            idx = self.inds_queue.pop(0)
+            # print(idx, len(self.inds_queue), self.inds_queue[:10], )
+            self.cur += 1
+            if self.imgrec is not None:
+                s = self.imgrec.read_idx(idx)
+                header, img = recordio.unpack(s)
+                label = header.label
+                if not isinstance(label, numbers.Number):
+                    label = label[0]
+                return label, img, None, None
+            else:
+                label, fname, bbox, landmark = self.imglist[idx]
+                return label, self.read_image(fname), bbox, landmark
     
     def next_sample(self):
         """Helper function for reading in next sample."""
@@ -211,7 +275,10 @@ class FaceImageIter(io.DataIter):
         i = 0
         try:
             while i < batch_size:
-                label, s, bbox, landmark = self.next_sample()
+                if self.metric_learning:
+                    label, s, bbox, landmark = self.next_sample_metric_learning()
+                else:
+                    label, s, bbox, landmark = self.next_sample()
                 _data = self.imdecode(s)
                 if _data.shape[0] != self.data_shape[1]:
                     _data = mx.image.resize_short(_data, self.data_shape[1])
@@ -329,6 +396,7 @@ class FaceImageIterList(io.DataIter):
             return ret
 
 
+'''
 import torch
 from pathlib import Path
 from torch.utils.data import DataLoader
@@ -440,3 +508,4 @@ if __name__ == '__main__':
         labels = np.squeeze(labels, 0)
         break
     print(imgs.shape)
+'''
