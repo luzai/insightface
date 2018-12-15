@@ -129,8 +129,19 @@ class FaceImageIter(io.DataIter):
         pids_now = np.random.choice(self.seq_identity,
                                     size=int(self.num_pids_per_batch),
                                     replace=False)
-        pids.extend(pids_now.tolist())
-        # while len(pids) < self.num_pids_per_batch:
+        for pid_now in pids_now.tolist():
+            a, b = self.id2range[pid_now]
+            nimgs = b - a
+            if nimgs >= 10:  # todo cutoff
+                pids.append(pid_now)
+        while len(pids) < self.num_pids_per_batch:
+            pid_now = np.random.choice(self.seq_identity)
+            if pid_now in pids: continue
+            a, b = self.id2range[pid_now]
+            nimgs = b - a
+            if nimgs<10: continue
+            pids.append(pid_now)
+            
         #     pids_next = []
         #     for pid in pids_now:
         #         if dop[pid] == -1 or dop[pid] in pids_next or dop[pid] in pids:

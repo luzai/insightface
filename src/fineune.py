@@ -4,7 +4,8 @@ from __future__ import print_function
 
 import os
 
-os.environ['CUDA_VISIBLE_DEVICES'] = "1,3"
+os.environ['CUDA_VISIBLE_DEVICES'] = "0,1"
+os.environ['MXNET_CPU_WORKER_NTHREADS'] = "12"
 import lz
 
 lz.init_mxnet()
@@ -144,7 +145,8 @@ def parse_args():
     parser.add_argument('--ce-loss', default=False, action='store_true', help='if output ce loss')
     
     # DATA_DIR = "/share/data/glint"
-    DATA_DIR = "/share/data/faces_ms1m_112x112"
+    # DATA_DIR = "/share/data/faces_ms1m_112x112"
+    DATA_DIR = "/data2/share/faces_ms1m_112x112"
     # NETWORK = "r100"
     NETWORK = "r50"
     # JOB = "-comb.glint"
@@ -159,7 +161,8 @@ def parse_args():
     
     parser.set_defaults(
         wd=0,
-        lr=0.01,
+        lr=3e-3,
+        lr_step=[25600, 25600 * 2, 25600 * 3],
         # lr=1e-5,
         # lr_steps='',  # init lr 1e-1, final lr 1e-4
         # fc7_lr_mult=1e4,
@@ -168,7 +171,7 @@ def parse_args():
         loss_type=LOSSTP,
         prefix=PREFIX,
         per_batch_size=100,
-        target="lfw",  #
+        target="",  #
         # target="",
         ce_loss=True,
         margin_a=.9,
@@ -176,7 +179,7 @@ def parse_args():
         margin_b=.15,
         # pretrained='../logs/model-r50-arcface-ms1m-refine-v1/model,0',
         # pretrained='../logs/model-r50-comb.glint/model,9',
-        pretrained='../logs/model-r50-comb.ms1m/model,32',
+        pretrained='../logs/model-r50-comb.ms1m/model,11',
         # verbose=60,
         ckpt=2,  # always save
     )
@@ -310,7 +313,7 @@ def train_net(args):
     base_mom = args.mom
     arg_params = None
     aux_params = None
-    sym, arg_params, aux_params = get_symbol(args, arg_params, aux_params, layer_name='glint_fc7')
+    sym, arg_params, aux_params = get_symbol(args, arg_params, aux_params, layer_name='ms1m_fc7')
     fixed_args = [n for n in sym.list_arguments() if 'fc7' in n]
     
     # sym.get_internals()
@@ -321,7 +324,9 @@ def train_net(args):
     
     # label_name = 'softmax_label'
     # label_shape = (args.batch_size,)
-    arg_params['glint_fc7_weight'] = arg_params['fc7_weight'].copy()
+    # arg_params['glint_fc7_weight'] = arg_params['fc7_weight'].copy()
+    # arg_params['ms1m_fc7_weight'] = arg_params['glint_fc7_weight'].copy()
+    assert 'ms1m_fc7_weight' in arg_params
     model = mx.mod.Module(
         context=ctx,
         symbol=sym,
@@ -355,7 +360,9 @@ def train_net(args):
         initializer = mx.init.Xavier(rnd_type='uniform', factor_type="in", magnitude=2)
     # initializer = mx.init.Xavier(rnd_type='gaussian', factor_type="out", magnitude=2) #resnet style
     _rescale = 1.0 / args.ctx_num
-    opt = optimizer.SGD(learning_rate=base_lr, momentum=base_mom, wd=base_wd, rescale_grad=_rescale)
+    # opt = optimizer.SGD(learning_rate=base_lr, momentum=base_mom, wd=base_wd, rescale_grad=_rescale)
+    logging.info(f'base lr {base_lr}')
+    opt = optimizer.Adam(learning_rate=base_lr, wd=base_wd, rescale_grad=_rescale, )
     som = 20
     _cb = mx.callback.Speedometer(args.batch_size, som)
     
@@ -411,7 +418,7 @@ def train_net(args):
         _cb(param)
         if mbatch % 1000 == 0:
             print('lr-batch-epoch: lr ', opt.lr,
-                  'nbatch ',param.nbatch,
+                  'nbatch ', param.nbatch,
                   'epoch ', param.epoch,
                   'mbatch ', mbatch,
                   'lr_step', lr_steps)
