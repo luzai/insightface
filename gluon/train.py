@@ -34,7 +34,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'blocks'))
 import fresnet
 from UDD import *
 #import finception_resnet_v2
-#import fmobilenet 
+#import fmobilenet
 #import fmobilenetv2
 #import fmobilefacenet
 #import fxception
@@ -44,7 +44,8 @@ from UDD import *
 #import spherenet
 #sys.path.append(os.path.join(os.path.dirname(__file__), 'losses'))
 #import center_loss
-
+# xrange =   lambda x : list(range(x))
+xrange = range
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -540,7 +541,7 @@ def train_net(args):
     #opt = optimizer.SGD(learning_rate=args.lr, momentum=args.mom, wd=args.wd, rescale_grad=_rescale)
     #opt = optimizer.SGD(learning_rate=args.lr, momentum=args.mom, wd=args.wd)
     if args.mode=='gluon':
-      trainer = gluon.Trainer(net.collect_params(), 'sgd', 
+      trainer = gluon.Trainer(net.collect_params(), 'sgd',
               {'learning_rate': args.lr, 'wd': args.wd, 'momentum': args.mom, 'multi_precision': True},
               kvstore=kv)
     else:
@@ -557,7 +558,7 @@ def train_net(args):
         fc7 = net(data)
       #sym = mx.symbol.SoftmaxOutput(data=fc7, label = label, name='softmax', normalization='valid')
       ceop = gluon.loss.SoftmaxCrossEntropyLoss()
-      loss = ceop(fc7, label) 
+      loss = ceop(fc7, label)
       #loss = loss/args.per_batch_size
       loss = mx.sym.mean(loss)
       sym = mx.sym.Group( [mx.symbol.BlockGrad(fc7), mx.symbol.MakeLoss(loss, name='softmax')] )

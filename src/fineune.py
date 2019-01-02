@@ -150,7 +150,7 @@ def parse_args():
     # NETWORK = "r100"
     NETWORK = "r50"
     # JOB = "-comb.glint"
-    JOB = "-comb.ms1m"
+    JOB = "-comb.bak"
     LOSSTP = "5"
     MODELDIR = "../logs/model-" + NETWORK + JOB
     if not os.path.exists(MODELDIR):
@@ -179,7 +179,7 @@ def parse_args():
         margin_b=.15,
         # pretrained='../logs/model-r50-arcface-ms1m-refine-v1/model,0',
         # pretrained='../logs/model-r50-comb.glint/model,9',
-        pretrained='../logs/model-r50-comb.ms1m/model,11',
+        pretrained='../logs/model-r50-comb.r50.ms1m/model,5',
         # verbose=60,
         ckpt=2,  # always save
     )

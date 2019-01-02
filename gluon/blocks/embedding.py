@@ -1,3 +1,5 @@
+from mxnet.gluon import nn
+from mxnet.gluon.block import HybridBlock
 
 class EmbeddingBlock(HybridBlock):
     def __init__(self, emb_size = 512, mode='E', **kwargs):
@@ -27,3 +29,4 @@ class EmbeddingBlock(HybridBlock):
 
 class MarginBlock(HybridBlock):
     def __init__(self, args, **kwargs):
+        pass

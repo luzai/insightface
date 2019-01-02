@@ -36,8 +36,9 @@ class FaceImageIter(io.DataIter):
                  rand_mirror=False, cutoff=0, color_jittering=0,
                  images_filter=0,
                  data_name='data', label_name='softmax_label',
-                 metric_learning=True,
-                 # metric_learning=False, # todo  metric learning batch formation method do not affetcts the scale of loss ?
+                 # metric_learning=True,
+                 metric_learning=False,
+                 # todo  metric learning batch formation method do not affects the scale of loss ?
                  **kwargs):
         super(FaceImageIter, self).__init__()
         self.metric_learning = metric_learning
@@ -132,16 +133,16 @@ class FaceImageIter(io.DataIter):
         for pid_now in pids_now.tolist():
             a, b = self.id2range[pid_now]
             nimgs = b - a
-            if nimgs >= 10:  # todo cutoff
+            if nimgs >= self.cutoff:
                 pids.append(pid_now)
         while len(pids) < self.num_pids_per_batch:
             pid_now = np.random.choice(self.seq_identity)
             if pid_now in pids: continue
             a, b = self.id2range[pid_now]
             nimgs = b - a
-            if nimgs<10: continue
+            if nimgs < self.cutoff: continue
             pids.append(pid_now)
-            
+        
         #     pids_next = []
         #     for pid in pids_now:
         #         if dop[pid] == -1 or dop[pid] in pids_next or dop[pid] in pids:

@@ -19,7 +19,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'common'))
 #import face_image
 import fresnet
 import fmobilenet 
-
+xrange = range
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)

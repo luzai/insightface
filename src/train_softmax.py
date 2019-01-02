@@ -2,12 +2,19 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import os
+import os, sys
 
-os.environ['CUDA_VISIBLE_DEVICES'] = "0"
+os.environ['CUDA_VISIBLE_DEVICES'] = "0,1,2"
+sys.path.insert(0, '/home/xinglu/prj/insightface/',  )
+os.environ['CU8'] = CU8 = '/data1/share/cuda-9.0/'
+os.environ['LD_LIBRARY_PATH'] = CU8 + '/extras/CUPTI/lib64/:' + os.environ['LD_LIBRARY_PATH']
+os.environ['LD_LIBRARY_PATH'] = CU8 + '/lib64/:' + os.environ['LD_LIBRARY_PATH']
+os.environ['PATH'] = CU8 + '/bin:' + os.environ['PATH']
+os.environ['MXNET_CPU_WORKER_NTHREADS'] = "24"
+os.environ['MXNET_CUDNN_AUTOTUNE_DEFAULT'] = "0"
+os.environ['MXNET_ENGINE_TYPE'] = "ThreadedEnginePerDevice"
 import lz
-
-lz.init_mxnet()
+# lz.init_mxnet()
 import sys
 import math
 import random
@@ -23,7 +30,7 @@ import argparse
 import mxnet.optimizer as optimizer
 from six.moves import xrange
 
-sys.path.append(os.path.join(os.path.dirname(__file__), 'common'))
+sys.path.append(os.path.join(os.path.dirname(__file__), 'commonl'))
 import face_image
 
 sys.path.append(os.path.join(os.path.dirname(__file__), 'eval'))
@@ -142,13 +149,14 @@ def parse_args():
     parser.add_argument('--images-filter', type=int, default=0, help='minimum images per identity filter')
     parser.add_argument('--target', type=str, default='lfw,cfp_fp,agedb_30', help='verification targets')
     parser.add_argument('--ce-loss', default=False, action='store_true', help='if output ce loss')
+    parser.add_argument('--kv', default='device')
     
-    # DATA_DIR = "/data1/share/faces_ms1m_112x112"
-    DATA_DIR = "/data2/share/glint"
+    DATA_DIR = "/data1/share/faces_ms1m_112x112"
+    # DATA_DIR = "/data2/share/glint"
     # DATA_DIR = "/share/data/faces_ms1m_112x112"
     # NETWORK = "r100"
     NETWORK = "r50"
-    JOB = "-comb.glint"
+    JOB = "-comb.r50.ms1m"
     LOSSTP = "5"
     MODELDIR = "../logs/model-" + NETWORK + JOB
     if not os.path.exists(MODELDIR):
@@ -158,23 +166,22 @@ def parse_args():
     LOGFILE = MODELDIR + '/log'
     
     parser.set_defaults(
-        lr=1e-5, lr_steps='',  # init lr 1e-1, final lr 1e-4
-        fc7_lr_mult=1e4,
+        # lr=1e-3, lr_steps='7600',  # init lr 1e-1, final lr 1e-4
+        # fc7_lr_mult=1e4,
         data_dir=DATA_DIR,
         network=NETWORK,
         loss_type=LOSSTP,
         prefix=PREFIX,
         per_batch_size=100,
         target="",  # lfw
-        # target="",
         ce_loss=True,
         margin_a=.9,
         margin_m=.4,
         margin_b=.15,
         # pretrained='../logs/model-r50-arcface-ms1m-refine-v1/model,0',
-        pretrained='../logs/model-r50-comb.glint/model,9',
+        pretrained='../logs/model-r50-comb.r50.ms1m/model,105',
         # verbose=60,
-        ckpt=2,  # always save
+        ckpt=1,  # 2 always save
     )
     
     args = parser.parse_args()
@@ -259,7 +266,6 @@ def get_symbol(args, arg_params, aux_params):
         s_m = s * m
         gt_one_hot = mx.sym.one_hot(gt_label, depth=args.num_classes, on_value=s_m, off_value=0.0)
         fc7 = fc7 - gt_one_hot
-    
     elif args.loss_type == 3:  # fgg
         s = args.margin_s
         assert s > 0.0
@@ -332,7 +338,6 @@ def get_symbol(args, arg_params, aux_params):
         fc7 = sym.FullyConnected(data=nembedding, weight=_weight,
                                  no_bias=True, num_hidden=args.num_classes,
                                  name='fc7')
-    
     elif args.loss_type == 4:
         s = args.margin_s
         m = args.margin_m
@@ -626,7 +631,6 @@ def train_net(args):
             results.append(acc2)
         return results
     
-    # ver_test( 0 )
     highest_acc = [0.0, 0.0]  # lfw and target
     # for i in xrange(len(ver_list)):
     #  highest_acc.append(0.0)
@@ -636,6 +640,8 @@ def train_net(args):
         lr_steps = [40000, 60000, 80000]
         if args.loss_type >= 1 and args.loss_type <= 7:
             lr_steps = [100000, 140000, 160000]
+            # lr_steps = np.asarray(lr_steps)
+            # lr_steps -= 100000 // 4 * 3
         p = 512.0 / args.batch_size
         for l in xrange(len(lr_steps)):
             lr_steps[l] = int(lr_steps[l] * p)
@@ -652,7 +658,9 @@ def train_net(args):
                 opt.lr *= 0.1
                 print('lr change to', opt.lr)
                 break
-        
+        # if param.nbatch%som==0:
+        #     param.eval_metric.get_name_value()
+        # todo log value plot
         _cb(param)
         if mbatch % 1000 == 0:
             print('lr-batch-epoch: lr nbatch epoch mbatch lr_step', opt.lr, param.nbatch, param.epoch, mbatch, lr_steps)
@@ -708,12 +716,21 @@ def train_net(args):
     epoch_cb = None
     train_dataiter = mx.io.PrefetchingIter(train_dataiter)
     
+    # this is for valiadation on the start
+    # model.bind(for_training=False,
+    #            data_shapes=train_dataiter.provide_data,
+    #            label_shapes=train_dataiter.provide_label,
+    #            )
+    # model.set_params(arg_params, aux_params)
+    # acc_list = ver_test(nbatch=0)
+    # print(acc_list)
+    
     model.fit(train_dataiter,
               begin_epoch=begin_epoch,
               num_epoch=end_epoch,
               eval_data=val_dataiter,
               eval_metric=eval_metrics,
-              kvstore='device',
+              kvstore=args.kv,
               optimizer=opt,
               # optimizer_params   = optimizer_params,
               initializer=initializer,
